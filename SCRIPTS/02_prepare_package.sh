@@ -21,8 +21,10 @@ sed -i 's,-SNAPSHOT,,g' package/base-files/image-config.in
 #sed -i '/mirror02/d' scripts/download.pl
 echo "net.netfilter.nf_conntrack_helper = 1" >>./package/kernel/linux/files/sysctl-nf-conntrack.conf
 # Nginx
+sed -i "s/large_client_header_buffers 2 1k/large_client_header_buffers 4 32k/g" feeds/packages/net/nginx-util/files/uci.conf.template
 sed -i "s/client_max_body_size 128M/client_max_body_size 2048M/g" feeds/packages/net/nginx-util/files/uci.conf.template
 sed -i '/client_max_body_size/a\\tclient_body_buffer_size 8192M;' feeds/packages/net/nginx-util/files/uci.conf.template
+sed -i '/client_max_body_size/a\\tserver_names_hash_bucket_size 128;' feeds/packages/net/nginx-util/files/uci.conf.template
 sed -i '/ubus_parallel_req/a\        ubus_script_timeout 600;' feeds/packages/net/nginx/files-luci-support/60_nginx-luci-support
 sed -ri "/luci-webui.socket/i\ \t\tuwsgi_send_timeout 600\;\n\t\tuwsgi_connect_timeout 600\;\n\t\tuwsgi_read_timeout 600\;" feeds/packages/net/nginx/files-luci-support/luci.locations
 sed -ri "/luci-cgi_io.socket/i\ \t\tuwsgi_send_timeout 600\;\n\t\tuwsgi_connect_timeout 600\;\n\t\tuwsgi_read_timeout 600\;" feeds/packages/net/nginx/files-luci-support/luci.locations
@@ -34,7 +36,7 @@ cp -rf ../PATCH/backport/TCP/* ./target/linux/generic/backport-5.15/
 cp -rf ../PATCH/backport/x86_csum/* ./target/linux/generic/backport-5.15/
 # Patch arm64 型号名称
 cp -rf ../immortalwrt/target/linux/generic/hack-5.15/312-arm64-cpuinfo-Add-model-name-in-proc-cpuinfo-for-64bit-ta.patch ./target/linux/generic/hack-5.15/312-arm64-cpuinfo-Add-model-name-in-proc-cpuinfo-for-64bit-ta.patch
-# BBRv2
+# BBRv3
 cp -rf ../PATCH/BBRv3/kernel/* ./target/linux/generic/backport-5.15/
 # LRNG
 cp -rf ../PATCH/LRNG/* ./target/linux/generic/hack-5.15/
@@ -64,6 +66,7 @@ cp -rf ../lede/target/linux/generic/hack-5.15/982-add-bcm-fullconenat-support.pa
 # FW4
 mkdir -p package/network/config/firewall4/patches
 cp -f ../PATCH/firewall/001-fix-fw4-flow-offload.patch ./package/network/config/firewall4/patches/001-fix-fw4-flow-offload.patch
+cp -f ../PATCH/firewall/002-fw4-udp53_and_apns.patch ./package/network/config/firewall4/patches/002-fw4-udp53_and_apns.patch
 cp -f ../PATCH/firewall/990-unconditionally-allow-ct-status-dnat.patch ./package/network/config/firewall4/patches/990-unconditionally-allow-ct-status-dnat.patch
 cp -f ../PATCH/firewall/999-01-firewall4-add-fullcone-support.patch ./package/network/config/firewall4/patches/999-01-firewall4-add-fullcone-support.patch
 mkdir -p package/libs/libnftnl/patches
@@ -96,6 +99,8 @@ rm -rf ./package/boot/uboot-rockchip
 cp -rf ../immortalwrt_23/package/boot/uboot-rockchip ./package/boot/uboot-rockchip
 rm -rf ./package/boot/arm-trusted-firmware-rockchip
 cp -rf ../immortalwrt_23/package/boot/arm-trusted-firmware-rockchip ./package/boot/arm-trusted-firmware-rockchip
+# 在下个release时删掉
+wget -qO - https://github.com/immortalwrt/immortalwrt/commit/4e7e1e851ff3c9b9af9dda83d4a7baea83c8ebdf.patch | patch -Rp1
 #intel-firmware
 wget -qO - https://github.com/openwrt/openwrt/commit/9c58add.patch | patch -p1
 wget -qO - https://github.com/openwrt/openwrt/commit/64f1a65.patch | patch -p1
@@ -114,6 +119,8 @@ cp -rf ../immortalwrt_pkg/net/dae ./feeds/packages/net/dae
 ln -sf ../../../feeds/packages/net/dae ./package/feeds/packages/dae
 cp -rf ../immortalwrt_pkg/net/daed ./feeds/packages/net/daed
 ln -sf ../../../feeds/packages/net/daed ./package/feeds/packages/daed
+cp -rf ../lucidaednext/daed-next ./package/new/daed-next
+cp -rf ../lucidaednext/luci-app-daed-next ./package/new/luci-app-daed-next
 git clone -b master --depth 1 https://github.com/QiuSimons/luci-app-daed package/new/luci-app-daed
 # btf
 wget -qO - https://github.com/immortalwrt/immortalwrt/commit/73e5679.patch | patch -p1
@@ -138,12 +145,13 @@ sed -i "s,(br-lan),,g" feeds/luci/modules/luci-base/root/usr/share/rpcd/ucode/lu
 rm -rf ./feeds/luci/modules/luci-mod-status
 cp -rf ../immortalwrt_luci_23/modules/luci-mod-status ./feeds/luci/modules/luci-mod-status
 rm -rf ./feeds/packages/utils/coremark
-cp -rf ../immortalwrt_pkg/utils/coremark ./feeds/packages/utils/coremark
-sed -i "s,-O3,-Ofast -funroll-loops -fpeel-loops -fgcse-sm -fgcse-las,g" feeds/packages/utils/coremark/Makefile
+cp -rf ../sbw_pkg/coremark ./feeds/packages/utils/coremark
 cp -rf ../immortalwrt_23/package/utils/mhz ./package/utils/mhz
 # Airconnect
-cp -rf ../OpenWrt-Add/airconnect ./package/new/airconnect
-cp -rf ../OpenWrt-Add/luci-app-airconnect ./package/new/luci-app-airconnect
+git clone https://github.com/sbwml/luci-app-airconnect package/new/airconnect
+sed -i 's,respawn,respawn 3600 5 0,g' package/new/airconnect/airconnect/files/airconnect.init
+#cp -rf ../OpenWrt-Add/airconnect ./package/new/airconnect
+#cp -rf ../OpenWrt-Add/luci-app-airconnect ./package/new/luci-app-airconnect
 # luci-app-ap-modem
 cp -rf ../linkease/applications/luci-app-ap-modem ./package/new/luci-app-ap-modem
 # luci-app-irqbalance
@@ -189,6 +197,18 @@ ln -sf ../../../feeds/luci/applications/luci-app-autoreboot ./package/feeds/luci
 # Boost 通用即插即用
 rm -rf ./feeds/packages/net/miniupnpd
 cp -rf ../openwrt_pkg_ma/net/miniupnpd ./feeds/packages/net/miniupnpd
+wget https://github.com/miniupnp/miniupnp/commit/0e8c68d.patch -O feeds/packages/net/miniupnpd/patches/0e8c68d.patch
+sed -i 's,/miniupnpd/,/,g' ./feeds/packages/net/miniupnpd/patches/0e8c68d.patch
+wget https://github.com/miniupnp/miniupnp/commit/21541fc.patch -O feeds/packages/net/miniupnpd/patches/21541fc.patch
+sed -i 's,/miniupnpd/,/,g' ./feeds/packages/net/miniupnpd/patches/21541fc.patch
+wget https://github.com/miniupnp/miniupnp/commit/b78a363.patch -O feeds/packages/net/miniupnpd/patches/b78a363.patch
+sed -i 's,/miniupnpd/,/,g' ./feeds/packages/net/miniupnpd/patches/b78a363.patch
+wget https://github.com/miniupnp/miniupnp/commit/8f2f392.patch -O feeds/packages/net/miniupnpd/patches/8f2f392.patch
+sed -i 's,/miniupnpd/,/,g' ./feeds/packages/net/miniupnpd/patches/8f2f392.patch
+wget https://github.com/miniupnp/miniupnp/commit/60f5705.patch -O feeds/packages/net/miniupnpd/patches/60f5705.patch
+sed -i 's,/miniupnpd/,/,g' ./feeds/packages/net/miniupnpd/patches/60f5705.patch
+wget https://github.com/miniupnp/miniupnp/commit/3f3582b.patch -O feeds/packages/net/miniupnpd/patches/3f3582b.patch
+sed -i 's,/miniupnpd/,/,g' ./feeds/packages/net/miniupnpd/patches/3f3582b.patch
 pushd feeds/packages
 patch -p1 <../../../PATCH/miniupnpd/01-set-presentation_url.patch
 patch -p1 <../../../PATCH/miniupnpd/02-force_forwarding.patch
@@ -250,7 +270,7 @@ cp -rf ../lede/package/lean/ipv6-helper ./package/new/ipv6-helper
 patch -p1 <../PATCH/odhcp6c/1002-odhcp6c-support-dhcpv6-hotplug.patch
 # ODHCPD
 mkdir -p package/network/services/odhcpd/patches
-cp -f ../PATCH/odhcpd/0001-config-allow-configuring-max-limit-for-preferred-and.patch ./package/network/services/odhcpd/patches/0001-config-allow-configuring-max-limit-for-preferred-and.patch
+cp -f ../PATCH/odhcpd/0001-odhcpd-improve-RFC-9096-compliance.patch ./package/network/services/odhcpd/patches/0001-odhcpd-improve-RFC-9096-compliance.patch
 # 京东签到 By Jerrykuku
 #git clone --depth 1 https://github.com/jerrykuku/node-request.git package/new/node-request
 #git clone --depth 1 https://github.com/jerrykuku/luci-app-jd-dailybonus.git package/new/luci-app-jd-dailybonus
@@ -265,11 +285,7 @@ cp -rf ../mosdns/v2ray-geodata ./package/new/v2ray-geodata
 # 流量监管
 cp -rf ../lede_luci/applications/luci-app-netdata ./package/new/luci-app-netdata
 # 上网 APP 过滤
-git clone -b master --depth 1 https://github.com/destan19/OpenAppFilter.git package/new/OpenAppFilter
-pushd package/new/OpenAppFilter
-wget -qO - https://github.com/QiuSimons/OpenAppFilter-destan19/commit/9088cc2.patch | patch -p1
-wget https://destan19.github.io/assets/oaf/open_feature/feature-cn-22-06-21.cfg -O ./open-app-filter/files/feature.cfg
-popd
+git clone -b master --depth 1 https://github.com/sbwml/OpenAppFilter.git package/new/OpenAppFilter
 # OLED 驱动程序
 git clone -b master --depth 1 https://github.com/NateLol/luci-app-oled.git package/new/luci-app-oled
 # homeproxy
@@ -277,7 +293,7 @@ git clone --single-branch --depth 1 -b dev https://github.com/immortalwrt/homepr
 rm -rf ./feeds/packages/net/sing-box
 cp -rf ../immortalwrt_pkg/net/sing-box ./feeds/packages/net/sing-box
 # OpenClash
-git clone --single-branch --depth 1 -b dev https://github.com/vernesong/OpenClash.git package/new/luci-app-openclash
+git clone --single-branch --depth 1 -b master https://github.com/vernesong/OpenClash.git package/new/luci-app-openclash
 # Passwall
 cp -rf ../passwall_luci/luci-app-passwall ./package/new/luci-app-passwall
 wget -P package/new/luci-app-passwall/ https://github.com/QiuSimons/OpenWrt-Add/raw/master/move_2_services.sh
@@ -323,34 +339,34 @@ git clone -b master --depth 1 https://github.com/tty228/luci-app-wechatpush.git 
 # ShadowsocksR Plus+ 依赖
 rm -rf ./feeds/packages/net/shadowsocks-libev
 cp -rf ../lede_pkg/net/shadowsocks-libev ./package/new/shadowsocks-libev
-cp -rf ../ssrp/shadow-tls ./package/new/shadow-tls
-cp -rf ../ssrp/tuic-client ./package/new/tuic-client
-cp -rf ../ssrp/redsocks2 ./package/new/redsocks2
-cp -rf ../ssrp/trojan ./package/new/trojan
-cp -rf ../ssrp/tcping ./package/new/tcping
-cp -rf ../ssrp/dns2tcp ./package/new/dns2tcp
-cp -rf ../ssrp/gn ./package/new/gn
-cp -rf ../ssrp/shadowsocksr-libev ./package/new/shadowsocksr-libev
-cp -rf ../ssrp/simple-obfs ./package/new/simple-obfs
-cp -rf ../ssrp/naiveproxy ./package/new/naiveproxy
-cp -rf ../ssrp/v2ray-core ./package/new/v2ray-core
+cp -rf ../sbwfw876/shadow-tls ./package/new/shadow-tls
+cp -rf ../sbwfw876/v2dat ./package/new/v2dat
+cp -rf ../sbwfw876/tuic-client ./package/new/tuic-client
+cp -rf ../sbwfw876/redsocks2 ./package/new/redsocks2
+cp -rf ../sbwfw876/trojan ./package/new/trojan
+cp -rf ../sbwfw876/tcping ./package/new/tcping
+cp -rf ../sbwfw876/dns2tcp ./package/new/dns2tcp
+cp -rf ../sbwfw876/gn ./package/new/gn
+cp -rf ../sbwfw876/shadowsocksr-libev ./package/new/shadowsocksr-libev
+cp -rf ../sbwfw876/simple-obfs ./package/new/simple-obfs
+cp -rf ../sbwfw876/naiveproxy ./package/new/naiveproxy
+cp -rf ../sbwfw876/v2ray-core ./package/new/v2ray-core
 cp -rf ../passwall_pkg/hysteria ./package/new/hysteria
-cp -rf ../ssrp/sagernet-core ./package/new/sagernet-core
+cp -rf ../sbwfw876/sagernet-core ./package/new/sagernet-core
 rm -rf ./feeds/packages/net/xray-core
 cp -rf ../immortalwrt_pkg/net/xray-core ./feeds/packages/net/xray-core
 sed -i '/CURDIR/d' feeds/packages/net/xray-core/Makefile
-cp -rf ../ssrp/v2ray-plugin ./package/new/v2ray-plugin
-cp -rf ../ssrp/shadowsocks-rust ./package/new/shadowsocks-rust
-cp -rf ../ssrp/lua-neturl ./package/new/lua-neturl
+cp -rf ../sbwfw876/v2ray-plugin ./package/new/v2ray-plugin
+cp -rf ../sbwfw876/shadowsocks-rust ./package/new/shadowsocks-rust
+cp -rf ../sbwfw876/lua-neturl ./package/new/lua-neturl
 rm -rf ./feeds/packages/net/kcptun
 cp -rf ../immortalwrt_pkg/net/kcptun ./feeds/packages/net/kcptun
 ln -sf ../../../feeds/packages/net/kcptun ./package/feeds/packages/kcptun
 # ShadowsocksR Plus+
-cp -rf ../ssrp/luci-app-ssr-plus ./package/new/luci-app-ssr-plus
+cp -rf ../sbwfw876/luci-app-ssr-plus ./package/new/luci-app-ssr-plus
 rm -rf ./package/new/luci-app-ssr-plus/po/zh_Hans
 pushd package/new
 wget -qO - https://github.com/fw876/helloworld/commit/5bbf6e7.patch | patch -p1
-grep -qF "shadowsocksr_server" luci-app-ssr-plus/root/etc/init.d/shadowsocksr || wget -qO - https://github.com/fw876/helloworld/pull/1249.patch | patch -p1
 popd
 pushd package/new/luci-app-ssr-plus
 sed -i '/Clang.CN.CIDR/a\o:value("https://fastly.jsdelivr.net/gh/QiuSimons/Chnroute@master/dist/chnroute/chnroute.txt", translate("QiuSimons/Chnroute"))' luasrc/model/cbi/shadowsocksr/advanced.lua
@@ -366,6 +382,22 @@ pushd package/new
 wget -qO - https://github.com/Lienol/openwrt-package/pull/39.patch | patch -p1
 popd
 sed -i '/socat\.config/d' feeds/packages/net/socat/Makefile
+# natmap
+git clone --depth 1 --branch master --single-branch --no-checkout https://github.com/muink/luci-app-natmapt.git package/luci-app-natmapt
+pushd package/luci-app-natmapt
+umask 022
+git checkout
+popd
+git clone --depth 1 --branch master --single-branch --no-checkout https://github.com/muink/openwrt-natmapt.git package/natmapt
+pushd package/natmapt
+umask 022
+git checkout
+popd
+git clone --depth 1 --branch master --single-branch --no-checkout https://github.com/muink/openwrt-stuntman.git package/stuntman
+pushd package/stuntman
+umask 022
+git checkout
+popd
 # 订阅转换
 cp -rf ../immortalwrt_pkg/net/subconverter ./feeds/packages/net/subconverter
 ln -sf ../../../feeds/packages/net/subconverter ./package/feeds/packages/subconverter
@@ -455,17 +487,24 @@ patch -p1 < ../PATCH/firewall/luci-app-firewall_add_sfe_switch.patch
 # Shortcut-FE 相关组件
 mkdir ./package/lean
 mkdir ./package/lean/shortcut-fe
-cp -rf ../lede/package/lean/shortcut-fe/fast-classifier ./package/lean/shortcut-fe/fast-classifier
+cp -rf ../lede/package/qca/shortcut-fe/fast-classifier ./package/lean/shortcut-fe/fast-classifier
 wget -qO - https://github.com/coolsnowwolf/lede/commit/331f04f.patch | patch -p1
 wget -qO - https://github.com/coolsnowwolf/lede/commit/232b8b4.patch | patch -p1
 wget -qO - https://github.com/coolsnowwolf/lede/commit/ec795c9.patch | patch -p1
 wget -qO - https://github.com/coolsnowwolf/lede/commit/789f805.patch | patch -p1
 wget -qO - https://github.com/coolsnowwolf/lede/commit/6398168.patch | patch -p1
-cp -rf ../lede/package/lean/shortcut-fe/shortcut-fe ./package/lean/shortcut-fe/shortcut-fe
+cp -rf ../lede/package/qca/shortcut-fe/shortcut-fe ./package/lean/shortcut-fe/shortcut-fe
 wget -qO - https://github.com/coolsnowwolf/lede/commit/0e29809.patch | patch -p1
 wget -qO - https://github.com/coolsnowwolf/lede/commit/eb70dad.patch | patch -p1
 wget -qO - https://github.com/coolsnowwolf/lede/commit/7ba3ec0.patch | patch -p1
-cp -rf ../lede/package/lean/shortcut-fe/simulated-driver ./package/lean/shortcut-fe/simulated-driver
+cp -rf ../lede/package/qca/shortcut-fe/simulated-driver ./package/lean/shortcut-fe/simulated-driver
+
+# NAT6
+git clone --depth 1 https://github.com/sbwml/packages_new_nat6 package/new/packages_new_nat6
+# Patch LuCI 以增添 NAT6 开关
+pushd feeds/luci
+patch -p1 <../../../PATCH/firewall/luci-app-firewall_add_ipv6-nat_fw4.patch
+popd
 
 #LTO/GC
 # Grub 2
